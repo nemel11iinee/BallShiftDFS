@@ -223,7 +223,7 @@ namespace BallShift
 
             var lblDepth = new Label
             {
-                Text = "Ограничение глубины поиска:",
+                Text = "Глубина поиска (расширяется авто):",
                 ForeColor = TextLight,
                 BackColor = Color.Transparent,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -378,26 +378,17 @@ namespace BallShift
             if (result.path == null)
             {
                 _solutionPath = null;
-                if (result.stats.Aborted)
-                {
-                    lblStatus.Text = "Поиск прерван: пространство состояний оказалось слишком большим для текущих ограничений.";
-                    MessageBox.Show(this,
-                        "Поиск был остановлен, так как число различных обнаруженных состояний превысило " +
-                        "безопасный предел по памяти. Попробуйте уменьшить ограничение глубины поиска.",
-                        "Поиск прерван", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                else
-                {
-                    lblStatus.Text = $"Решение не найдено в пределах глубины {maxDepth}. Попробуйте увеличить ограничение.";
-                    MessageBox.Show(this,
-                        "Путь к целевому состоянию не найден в заданных пределах глубины поиска.",
-                        "Решение не найдено", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                lblStatus.Text = "Решение не найдено: целевое состояние недостижимо.";
+                MessageBox.Show(this,
+                    "Путь к целевому состоянию не найден даже при максимальной глубине поиска.",
+                    "Решение не найдено", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             _solutionPath = result.path;
-            lblStatus.Text = $"Решение найдено! Длина пути: {result.path.Count - 1} ход(ов). Нажмите «Анимация пути».";
+            lblStatus.Text = $"Решение найдено! Длина пути: {result.path.Count - 1} ход(ов)."
+                + (result.stats.LimitExtended ? $" Глубина автоматически увеличена сверх {maxDepth}." : "")
+                + " Нажмите «Анимация пути».";
             _animIndex = 0;
             animGrid.Grid = result.path[0].ToGrid();
             lblStepInfo.Text = $"Шаг 0 из {result.path.Count - 1} (начальное состояние)";

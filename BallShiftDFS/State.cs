@@ -32,6 +32,9 @@ namespace BallShift
 
         private readonly uint _packed;
 
+        /// <summary>Упакованное представление поля (2 бита на клетку).</summary>
+        public uint Packed => _packed;
+
         public State Parent { get; }
         public MoveKind Move { get; }
         public int MoveIndex { get; } // номер строки/столбца, к которому относится Move (-1, если хода не было)
@@ -93,6 +96,19 @@ namespace BallShift
                 children.Add(ShiftColumn(col, up: false));
             }
             return children;
+        }
+
+        /// <summary>Применяет ход к состоянию и возвращает дочернее состояние (родитель — текущее).</summary>
+        public State Apply(MoveKind move, int index)
+        {
+            switch (move)
+            {
+                case MoveKind.RowLeft: return ShiftRow(index, left: true);
+                case MoveKind.RowRight: return ShiftRow(index, left: false);
+                case MoveKind.ColUp: return ShiftColumn(index, up: true);
+                case MoveKind.ColDown: return ShiftColumn(index, up: false);
+                default: throw new ArgumentException("Недопустимый ход", nameof(move));
+            }
         }
 
         private State ShiftRow(int row, bool left)
