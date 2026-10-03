@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace BallShift
 {
@@ -177,17 +176,6 @@ namespace BallShift
             for (int idx = 0; idx < Size * Size; idx++)
                 counts[GetCell(_packed, idx)]++;
             return counts;
-        }
-
-        public string ToFileLine()
-        {
-            var sb = new StringBuilder();
-            for (int idx = 0; idx < Size * Size; idx++)
-            {
-                sb.Append(GetCell(_packed, idx));
-                if (idx != Size * Size - 1) sb.Append(',');
-            }
-            return sb.ToString();
         }
 
         public bool Equals(State other) => other != null && _packed == other._packed;
