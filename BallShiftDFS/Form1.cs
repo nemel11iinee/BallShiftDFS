@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -17,8 +16,6 @@ namespace BallShift
         private BallGridControl animGrid;
 
         private Button btnRandom;
-        private Button btnLoad;
-        private Button btnSave;
         private Button btnSolve;
         private Button btnPlay;
         private Button btnStop;
@@ -143,19 +140,6 @@ namespace BallShift
             layout.Controls.Add(goalGrid, 0, 0);
 
             layout.Controls.Add(MakeHint("Целевая расстановка шариков"), 0, 1);
-
-            var fileLayout = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, Dock = DockStyle.Fill, BackColor = PanelDark };
-            fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-
-            btnLoad = MakeButton("Загрузить из файла", PanelDark);
-            btnLoad.Click += BtnLoad_Click;
-            btnSave = MakeButton("Сохранить в файл", PanelDark);
-            btnSave.Click += BtnSave_Click;
-
-            fileLayout.Controls.Add(btnLoad, 0, 0);
-            fileLayout.Controls.Add(btnSave, 1, 0);
-            layout.Controls.Add(fileLayout, 0, 2);
 
             return WrapGroup("Целевое состояние", layout);
         }
@@ -385,9 +369,12 @@ namespace BallShift
                 return;
             }
 
+            if (result.stats.LimitExtended)
+                numMaxDepth.Value = Math.Min(numMaxDepth.Maximum, Math.Max(numMaxDepth.Minimum, result.stats.DepthLimit));
+
             _solutionPath = result.path;
             lblStatus.Text = $"Решение найдено! Длина пути: {result.path.Count - 1} ход(ов)."
-                + (result.stats.LimitExtended ? $" Глубина автоматически увеличена сверх {maxDepth}." : "")
+                + (result.stats.LimitExtended ? $" Глубина автоматически увеличена с {maxDepth} до {result.stats.DepthLimit}." : "")
                 + " Нажмите «Анимация пути».";
             _animIndex = 0;
             animGrid.Grid = result.path[0].ToGrid();
@@ -407,7 +394,6 @@ namespace BallShift
         {
             btnSolve.Enabled = !inProgress;
             btnRandom.Enabled = !inProgress;
-            btnLoad.Enabled = !inProgress;
             startGrid.Editable = !inProgress;
             goalGrid.Editable = !inProgress;
             numMaxDepth.Enabled = !inProgress;
@@ -453,50 +439,6 @@ namespace BallShift
         {
             animTimer.Stop();
             btnPlay.Enabled = true;
-        }
-
-        private void BtnLoad_Click(object sender, EventArgs e)
-        {
-            using (var ofd = new OpenFileDialog { Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*" })
-            {
-                if (ofd.ShowDialog(this) != DialogResult.OK) return;
-                try
-                {
-                    var lines = File.ReadAllLines(ofd.FileName);
-                    var startVals = lines[0].Split(',').Select(int.Parse).ToArray();
-                    var goalVals = lines[1].Split(',').Select(int.Parse).ToArray();
-                    startGrid.Grid = ToGrid(startVals);
-                    goalGrid.Grid = ToGrid(goalVals);
-                    ClearStats();
-                    lblStatus.Text = "Состояния загружены из файла: " + Path.GetFileName(ofd.FileName);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(this, "Не удалось прочитать файл: " + ex.Message, "Ошибка",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        private void BtnSave_Click(object sender, EventArgs e)
-        {
-            using (var sfd = new SaveFileDialog { Filter = "Текстовые файлы (*.txt)|*.txt", FileName = "state.txt" })
-            {
-                if (sfd.ShowDialog(this) != DialogResult.OK) return;
-                var line1 = State.FromGrid(startGrid.Grid).ToFileLine();
-                var line2 = State.FromGrid(goalGrid.Grid).ToFileLine();
-                File.WriteAllLines(sfd.FileName, new[] { line1, line2 });
-                lblStatus.Text = "Состояния сохранены в файл: " + Path.GetFileName(sfd.FileName);
-            }
-        }
-
-        private int[,] ToGrid(int[] flat)
-        {
-            var g = new int[4, 4];
-            for (int i = 0; i < 4; i++)
-                for (int j = 0; j < 4; j++)
-                    g[i, j] = flat[i * 4 + j];
-            return g;
         }
     }
 }
