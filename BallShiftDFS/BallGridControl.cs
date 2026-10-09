@@ -6,35 +6,30 @@ using System.Windows.Forms;
 
 namespace BallShift
 {
-    /// <summary>
-    /// Визуальный виджет поля 4x4. Используется трижды на форме: для начального состояния,
-    /// целевого состояния (оба — редактируемые кликом) и для отображения текущего шага анимации
-    /// найденного пути (нередактируемый).
-    /// </summary>
+    
     public class BallGridControl : UserControl
     {
         public const int Cells = 4;
 
         public static readonly Color[] Palette =
         {
-            Color.FromArgb(231, 76, 60),   // красный
-            Color.FromArgb(46, 204, 113),  // зелёный
-            Color.FromArgb(52, 152, 219),  // синий
-            Color.FromArgb(241, 196, 15)   // жёлтый
+            Color.FromArgb(231, 76, 60),  
+            Color.FromArgb(46, 204, 113), 
+            Color.FromArgb(52, 152, 219), 
+            Color.FromArgb(241, 196, 15)  
         };
 
         private int[,] _grid = new int[Cells, Cells];
         private int _highlightRow = -1;
         private int _highlightCol = -1;
 
-        // --- состояние плавной анимации одного хода ---
         private Timer _moveTimer;
         private readonly Stopwatch _moveClock = new Stopwatch();
         private int[,] _moveTarget;
         private MoveKind _moveKind;
         private int _moveIndex;
         private int _moveDurationMs;
-        private float _moveProgress; // 0..1 после сглаживания
+        private float _moveProgress;
 
         private bool IsMoving => _moveTarget != null;
 
@@ -58,11 +53,7 @@ namespace BallShift
             set { CancelMove(); _grid = value; _highlightRow = -1; _highlightCol = -1; Invalidate(); }
         }
 
-        /// <summary>
-        /// Плавно сдвигает строку/столбец на одну клетку: шарики едут, а тот, что выходит за край,
-        /// появляется с противоположной стороны. По окончании поле принимает значение newGrid.
-        /// Если предыдущий ход ещё не завершился, он мгновенно доигрывается.
-        /// </summary>
+       
         public void AnimateMove(int[,] newGrid, MoveKind move, int index, int durationMs)
         {
             FinishMove();
@@ -80,7 +71,6 @@ namespace BallShift
             _moveTimer.Start();
         }
 
-        /// <summary>Мгновенно доигрывает текущий ход (если он идёт) — поле принимает конечное состояние.</summary>
         public void FinishMove()
         {
             if (!IsMoving) return;
@@ -101,7 +91,7 @@ namespace BallShift
         {
             float t = (float)_moveClock.ElapsedMilliseconds / _moveDurationMs;
             if (t >= 1f) { FinishMove(); return; }
-            _moveProgress = t * t * (3f - 2f * t); // плавный разгон и торможение
+            _moveProgress = t * t * (3f - 2f * t); 
             Invalidate();
         }
 
@@ -114,8 +104,6 @@ namespace BallShift
         public void Randomize(Random rnd)
         {
             CancelMove();
-            // Ровно по 4 шарика каждого из 4 цветов (16 клеток = 4 цвета x 4 шарика),
-            // порядок на поле — случайная перестановка (Fisher-Yates).
             var values = new System.Collections.Generic.List<int>(Cells * Cells);
             for (int color = 0; color < 4; color++)
                 for (int k = 0; k < Cells; k++)
@@ -139,7 +127,6 @@ namespace BallShift
             Invalidate();
         }
 
-        /// <summary>Подсвечивает строку и/или столбец (для анимации). -1 — не подсвечивать.</summary>
         public void HighlightRowCol(int row, int col)
         {
             _highlightRow = row;
@@ -158,7 +145,7 @@ namespace BallShift
             int row = (int)(e.Y / ch);
             if (row < 0 || row >= Cells || col < 0 || col >= Cells) return;
 
-            _grid[row, col] = (_grid[row, col] + 1) % 4; // клик = следующий цвет по кругу
+            _grid[row, col] = (_grid[row, col] + 1) % 4; 
             Invalidate();
             GridChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -174,7 +161,6 @@ namespace BallShift
             float cw = Width / (float)Cells;
             float ch = Height / (float)Cells;
 
-            // Фон клеток — статичный, шарики рисуются поверх (движущаяся линия — со смещением).
             for (int i = 0; i < Cells; i++)
             {
                 for (int j = 0; j < Cells; j++)
@@ -209,7 +195,6 @@ namespace BallShift
 
                     if (moving)
                     {
-                        // Копия шарика с противоположной стороны линии: создаёт эффект "зацикливания".
                         float wrapX = rowMove ? -sign * Cells * cw : 0;
                         float wrapY = colMove ? -sign * Cells * ch : 0;
                         DrawBall(g, new RectangleF(cellRect.X + wrapX, cellRect.Y + wrapY, cw, ch), _grid[i, j]);

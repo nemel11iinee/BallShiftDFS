@@ -29,8 +29,8 @@ namespace BallShift
         private Label lblStepInfo;
         private Label lblStatus;
 
-        private const int StepIntervalMs = 750; // период шагов анимации пути
-        private const int MoveDurationMs = 500;  // длительность плавного сдвига внутри шага
+        private const int StepIntervalMs = 750; 
+        private const int MoveDurationMs = 500; 
 
         private readonly Timer animTimer;
         private List<State> _solutionPath;
@@ -291,7 +291,6 @@ namespace BallShift
             return b;
         }
 
-        // ==================== Логика ====================
 
         private void RandomizeAll()
         {
@@ -436,7 +435,6 @@ namespace BallShift
             }
             else
             {
-                // Плавно двигаем шарики выбранной строки/столбца к следующему состоянию пути.
                 animGrid.FinishMove();
                 animGrid.HighlightRowCol(hRow, hCol);
                 animGrid.AnimateMove(st.ToGrid(), st.Move, st.MoveIndex, MoveDurationMs);

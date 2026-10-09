@@ -4,50 +4,26 @@ using System.Diagnostics;
 
 namespace BallShift
 {
-    /// <summary>Статистика одного запуска поиска.</summary>
     public class SearchStats
     {
-        public int Iterations;        // сколько раз алгоритм извлекал узел из O (раскрыл узел)
-        public int MaxOpenSize;       // максимальный размер списка O за весь процесс
-        public int OpenSizeAtEnd;     // размер списка O на момент завершения поиска
-        public int MaxTotalSize;      // максимум |O| + |C| за весь процесс поиска
+        public int Iterations;       
+        public int MaxOpenSize;      
+        public int OpenSizeAtEnd;     
+        public int MaxTotalSize;     
         public bool Found;
-        public bool Aborted;          // true, если поиск остановлен досрочно (достигнут абсолютный предел глубины)
-        public int DepthLimit;        // текущий (на момент завершения — последний) предел глубины
-        public bool LimitExtended;    // true, если пришлось выйти за глубину, заданную пользователем
+        public bool Aborted;          
+        public int DepthLimit;        
+        public bool LimitExtended;    
         public TimeSpan Elapsed;
 
         public SearchStats Clone() => (SearchStats)MemberwiseClone();
     }
 
-    /// <summary>
-    /// Поиск в глубину в пространстве состояний с итеративным углублением.
-    ///
-    /// Раньше поиск был обычным DFS с фиксированным ограничением глубины и общим множеством
-    /// "уже виденных" состояний. Такой поиск неполон: состояние, впервые встреченное на большой
-    /// глубине, запрещало дойти до него по короткому пути, поэтому решение часто не находилось,
-    /// а множество состояний разрасталось до миллионов и поиск прерывался по памяти.
-    ///
-    /// Теперь выполняется серия поисков в глубину с растущим пределом глубины (L = нижняя оценка,
-    /// L+1, L+2, ...) до тех пор, пока решение не найдётся — если заданной пользователем глубины
-    /// не хватает, предел автоматически увеличивается. Это даёт полноту поиска и кратчайший путь.
-    ///
-    /// Ускорение:
-    ///  * состояние — одно 32-битное число (2 бита на клетку), ходы — битовые операции без аллокаций;
-    ///  * отсечение по оценке: один ход меняет не более 4 клеток, поэтому до цели не меньше
-    ///    ceil(число_несовпадающих_клеток / 4) ходов (если g + оценка > предела — ветка отсекается);
-    ///  * список C — хэш-таблица ограниченного размера "состояние -> наименьшая глубина, на которой
-    ///    оно встречалось"; повторный заход на ту же или большую глубину отсекается. Если таблица
-    ///    заполнилась, новые состояния просто не запоминаются (корректность не страдает, память
-    ///    ограничена);
-    ///  * не делаем ход, обратный предыдущему.
-    /// Список O — стек ещё не раскрытых потомков вдоль текущей ветки.
-    /// </summary>
     public static class DfsSolver
     {
         private const int ProgressReportEvery = 20000;
-        private const int AbsoluteMaxDepth = 200;  // страховка от бесконечного цикла для недостижимой цели
-        private const int TableBits = 23;          // 8M ячеек (~40 МБ)
+        private const int AbsoluteMaxDepth = 200; 
+        private const int TableBits = 23;         
         private const int ProbeLength = 8;
 
         public static (List<State> path, SearchStats stats) Solve(
@@ -131,7 +107,6 @@ namespace BallShift
                 Stats.Iterations++;
                 if (state == _goal) { _foundLength = depth; return true; }
 
-                // Узел извлечён из O и раскрывается: его потомки попадают в O.
                 var states = _kidStates[depth];
                 var moves = _kidMoves[depth];
                 int n = 0;
@@ -174,7 +149,7 @@ namespace BallShift
                 Stats.Elapsed = _sw.Elapsed;
             }
 
-            /// <summary>Возвращает true, если состояние уже встречалось на такой же или меньшей глубине.</summary>
+            // возвращает true, если состояние уже встречалось на такой же или меньшей глубине
             private bool Seen(uint state, int depth)
             {
                 uint mask = (1u << TableBits) - 1;
@@ -195,7 +170,7 @@ namespace BallShift
                         return false;
                     }
                 }
-                return false; // таблица переполнена в этой области — просто не запоминаем
+                return false; 
             }
 
             private int Estimate(uint state)
@@ -215,15 +190,10 @@ namespace BallShift
 
             private static bool IsInverse(int a, int b)
             {
-                // ходы 0/1 (строка влево/вправо) и 2/3 (столбец вверх/вниз) взаимно обратны при том же индексе
                 return (a & 3) == (b & 3) && ((a >> 2) ^ 1) == (b >> 2);
             }
         }
 
-        /// <summary>
-        /// Применяет ход к упакованному состоянию. Номер хода m: m >> 2 — вид (0 строка влево,
-        /// 1 строка вправо, 2 столбец вверх, 3 столбец вниз), m &amp; 3 — номер строки/столбца.
-        /// </summary>
         internal static uint Apply(uint p, int m)
         {
             int kind = m >> 2, i = m & 3;
