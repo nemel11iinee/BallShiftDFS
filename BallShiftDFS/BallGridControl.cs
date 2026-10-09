@@ -1,30 +1,37 @@
 using System;
 using System.Drawing;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace BallShift
 {
-    /// <summary>
-    /// Визуальный виджет поля 4x4. Используется трижды на форме: для начального состояния,
-    /// целевого состояния (оба — редактируемые кликом) и для отображения текущего шага анимации
-    /// найденного пути (нередактируемый).
-    /// </summary>
+    
     public class BallGridControl : UserControl
     {
         public const int Cells = 4;
 
         public static readonly Color[] Palette =
         {
-            Color.FromArgb(231, 76, 60),   // красный
-            Color.FromArgb(46, 204, 113),  // зелёный
-            Color.FromArgb(52, 152, 219),  // синий
-            Color.FromArgb(241, 196, 15)   // жёлтый
+            Color.FromArgb(231, 76, 60),  
+            Color.FromArgb(46, 204, 113), 
+            Color.FromArgb(52, 152, 219), 
+            Color.FromArgb(241, 196, 15)  
         };
 
         private int[,] _grid = new int[Cells, Cells];
         private int _highlightRow = -1;
         private int _highlightCol = -1;
+
+        private Timer _moveTimer;
+        private readonly Stopwatch _moveClock = new Stopwatch();
+        private int[,] _moveTarget;
+        private MoveKind _moveKind;
+        private int _moveIndex;
+        private int _moveDurationMs;
+        private float _moveProgress;
+
+        private bool IsMoving => _moveTarget != null;
 
         public bool Editable { get; set; } = false;
         public event EventHandler GridChanged;
@@ -43,13 +50,60 @@ namespace BallShift
         public int[,] Grid
         {
             get => _grid;
-            set { _grid = value; _highlightRow = -1; _highlightCol = -1; Invalidate(); }
+            set { CancelMove(); _grid = value; _highlightRow = -1; _highlightCol = -1; Invalidate(); }
+        }
+
+       
+        public void AnimateMove(int[,] newGrid, MoveKind move, int index, int durationMs)
+        {
+            FinishMove();
+            _moveTarget = newGrid;
+            _moveKind = move;
+            _moveIndex = index;
+            _moveDurationMs = Math.Max(1, durationMs);
+            _moveProgress = 0f;
+            if (_moveTimer == null)
+            {
+                _moveTimer = new Timer { Interval = 15 };
+                _moveTimer.Tick += MoveTimer_Tick;
+            }
+            _moveClock.Restart();
+            _moveTimer.Start();
+        }
+
+        public void FinishMove()
+        {
+            if (!IsMoving) return;
+            _moveTimer.Stop();
+            _grid = _moveTarget;
+            _moveTarget = null;
+            Invalidate();
+        }
+
+        private void CancelMove()
+        {
+            if (!IsMoving) return;
+            _moveTimer.Stop();
+            _moveTarget = null;
+        }
+
+        private void MoveTimer_Tick(object sender, EventArgs e)
+        {
+            float t = (float)_moveClock.ElapsedMilliseconds / _moveDurationMs;
+            if (t >= 1f) { FinishMove(); return; }
+            _moveProgress = t * t * (3f - 2f * t); 
+            Invalidate();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _moveTimer != null) _moveTimer.Dispose();
+            base.Dispose(disposing);
         }
 
         public void Randomize(Random rnd)
         {
-            // Ровно по 4 шарика каждого из 4 цветов (16 клеток = 4 цвета x 4 шарика),
-            // порядок на поле — случайная перестановка (Fisher-Yates).
+            CancelMove();
             var values = new System.Collections.Generic.List<int>(Cells * Cells);
             for (int color = 0; color < 4; color++)
                 for (int k = 0; k < Cells; k++)
@@ -73,7 +127,6 @@ namespace BallShift
             Invalidate();
         }
 
-        /// <summary>Подсвечивает строку и/или столбец (для анимации). -1 — не подсвечивать.</summary>
         public void HighlightRowCol(int row, int col)
         {
             _highlightRow = row;
@@ -84,6 +137,7 @@ namespace BallShift
         private void BallGridControl_MouseClick(object sender, MouseEventArgs e)
         {
             if (!Editable) return;
+            FinishMove();
 
             float cw = Width / (float)Cells;
             float ch = Height / (float)Cells;
@@ -91,7 +145,7 @@ namespace BallShift
             int row = (int)(e.Y / ch);
             if (row < 0 || row >= Cells || col < 0 || col >= Cells) return;
 
-            _grid[row, col] = (_grid[row, col] + 1) % 4; // клик = следующий цвет по кругу
+            _grid[row, col] = (_grid[row, col] + 1) % 4; 
             Invalidate();
             GridChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -120,27 +174,54 @@ namespace BallShift
                         : Color.FromArgb(25, 255, 255, 255)))
                     using (var path = RoundedRect(innerRect, 8))
                         g.FillPath(cellBg, path);
+                }
+            }
 
-                    var ballRect = RectangleF.Inflate(cellRect, -cw * 0.18f, -ch * 0.18f);
-                    int colorIdx = _grid[i, j];
+            bool rowMove = IsMoving && (_moveKind == MoveKind.RowLeft || _moveKind == MoveKind.RowRight);
+            bool colMove = IsMoving && (_moveKind == MoveKind.ColUp || _moveKind == MoveKind.ColDown);
+            float sign = (_moveKind == MoveKind.RowLeft || _moveKind == MoveKind.ColUp) ? -1f : 1f;
 
-                    using (var shadow = new SolidBrush(Color.FromArgb(70, 0, 0, 0)))
-                        g.FillEllipse(shadow, ballRect.X + 2, ballRect.Y + 3, ballRect.Width, ballRect.Height);
+            for (int i = 0; i < Cells; i++)
+            {
+                for (int j = 0; j < Cells; j++)
+                {
+                    float dx = 0, dy = 0;
+                    bool moving = false;
+                    if (rowMove && i == _moveIndex) { dx = sign * _moveProgress * cw; moving = true; }
+                    if (colMove && j == _moveIndex) { dy = sign * _moveProgress * ch; moving = true; }
 
-                    using (var brush = new LinearGradientBrush(
-                        ballRect,
-                        ControlPaint.Light(Palette[colorIdx], 0.35f),
-                        ControlPaint.Dark(Palette[colorIdx], 0.1f),
-                        LinearGradientMode.ForwardDiagonal))
-                        g.FillEllipse(brush, ballRect);
+                    var cellRect = new RectangleF(j * cw + dx, i * ch + dy, cw, ch);
+                    DrawBall(g, cellRect, _grid[i, j]);
 
-                    using (var pen = new Pen(Color.FromArgb(130, 255, 255, 255), 1.5f))
-                        g.DrawEllipse(pen, ballRect);
+                    if (moving)
+                    {
+                        float wrapX = rowMove ? -sign * Cells * cw : 0;
+                        float wrapY = colMove ? -sign * Cells * ch : 0;
+                        DrawBall(g, new RectangleF(cellRect.X + wrapX, cellRect.Y + wrapY, cw, ch), _grid[i, j]);
+                    }
                 }
             }
 
             using (var borderPen = new Pen(Color.FromArgb(52, 73, 94), 2))
                 g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
+        }
+
+        private static void DrawBall(Graphics g, RectangleF cellRect, int colorIdx)
+        {
+            var ballRect = RectangleF.Inflate(cellRect, -cellRect.Width * 0.18f, -cellRect.Height * 0.18f);
+
+            using (var shadow = new SolidBrush(Color.FromArgb(70, 0, 0, 0)))
+                g.FillEllipse(shadow, ballRect.X + 2, ballRect.Y + 3, ballRect.Width, ballRect.Height);
+
+            using (var brush = new LinearGradientBrush(
+                ballRect,
+                ControlPaint.Light(Palette[colorIdx], 0.35f),
+                ControlPaint.Dark(Palette[colorIdx], 0.1f),
+                LinearGradientMode.ForwardDiagonal))
+                g.FillEllipse(brush, ballRect);
+
+            using (var pen = new Pen(Color.FromArgb(130, 255, 255, 255), 1.5f))
+                g.DrawEllipse(pen, ballRect);
         }
 
         private static GraphicsPath RoundedRect(RectangleF r, float radius)

@@ -29,6 +29,9 @@ namespace BallShift
         private Label lblStepInfo;
         private Label lblStatus;
 
+        private const int StepIntervalMs = 750; 
+        private const int MoveDurationMs = 500; 
+
         private readonly Timer animTimer;
         private List<State> _solutionPath;
         private int _animIndex;
@@ -42,7 +45,7 @@ namespace BallShift
 
         public Form1()
         {
-            animTimer = new Timer { Interval = 550 };
+            animTimer = new Timer { Interval = StepIntervalMs };
             animTimer.Tick += AnimTimer_Tick;
 
             InitializeUi();
@@ -288,7 +291,6 @@ namespace BallShift
             return b;
         }
 
-        // ==================== Логика ====================
 
         private void RandomizeAll()
         {
@@ -411,6 +413,7 @@ namespace BallShift
             _animIndex = 0;
             animTimer.Start();
             btnPlay.Enabled = false;
+            AnimTimer_Tick(null, EventArgs.Empty); // сразу показываем начальное состояние
         }
 
         private void AnimTimer_Tick(object sender, EventArgs e)
@@ -422,11 +425,20 @@ namespace BallShift
             }
 
             var st = _solutionPath[_animIndex];
-            animGrid.Grid = st.ToGrid();
 
             int hRow = (st.Move == MoveKind.RowLeft || st.Move == MoveKind.RowRight) ? st.MoveIndex : -1;
             int hCol = (st.Move == MoveKind.ColUp || st.Move == MoveKind.ColDown) ? st.MoveIndex : -1;
-            animGrid.HighlightRowCol(hRow, hCol);
+
+            if (_animIndex == 0)
+            {
+                animGrid.Grid = st.ToGrid();
+            }
+            else
+            {
+                animGrid.FinishMove();
+                animGrid.HighlightRowCol(hRow, hCol);
+                animGrid.AnimateMove(st.ToGrid(), st.Move, st.MoveIndex, MoveDurationMs);
+            }
 
             lblStepInfo.Text = _animIndex == 0
                 ? $"Шаг 0 из {_solutionPath.Count - 1} (начальное состояние)"
@@ -438,6 +450,7 @@ namespace BallShift
         private void StopAnimation()
         {
             animTimer.Stop();
+            animGrid.FinishMove();
             btnPlay.Enabled = true;
         }
     }
