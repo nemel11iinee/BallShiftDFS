@@ -58,6 +58,9 @@ namespace BallShift
             return new State(packed, null, MoveKind.None, -1);
         }
 
+        /// <summary>Строит состояние (без родителя) из упакованного представления.</summary>
+        public static State FromPacked(uint packed) => new State(packed, null, MoveKind.None, -1);
+
         /// <summary>Разворачивает упакованное состояние обратно в обычный 4x4 массив — для отрисовки.</summary>
         public int[,] ToGrid()
         {

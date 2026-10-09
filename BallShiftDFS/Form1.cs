@@ -19,7 +19,12 @@ namespace BallShift
         private Button btnSolve;
         private Button btnPlay;
         private Button btnStop;
+        private Button btnCompare;
         private NumericUpDown numMaxDepth;
+        private ComboBox cmbAlgorithm;
+        private ComboBox cmbOpenList;
+        private Label lblGenerated;
+        private Label lblBranching;
 
         private Label lblIterations;
         private Label lblMaxOpen;
@@ -56,10 +61,10 @@ namespace BallShift
 
         private void InitializeUi()
         {
-            Text = "Лаб. работа №1 — «Двигаем шарики» (Поиск в глубину, вариант 14)";
+            Text = "Лаб. работы №1 и №3 — «Двигаем шарики» (поиск в глубину и A*)";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(980, 680);
-            Size = new Size(1080, 720);
+            MinimumSize = new Size(1000, 740);
+            Size = new Size(1100, 800);
             BackColor = BgDark;
             Font = new Font("Segoe UI", 9F);
 
@@ -71,8 +76,8 @@ namespace BallShift
                 BackColor = BgDark,
                 Padding = new Padding(16)
             };
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 72));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 64));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 36));
             Controls.Add(root);
 
             var boards = new TableLayoutPanel
@@ -182,49 +187,72 @@ namespace BallShift
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
 
-            var statsGrid = new TableLayoutPanel { ColumnCount = 2, RowCount = 5, Dock = DockStyle.Fill };
-            for (int i = 0; i < 5; i++) statsGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            var statsGrid = new TableLayoutPanel { ColumnCount = 2, RowCount = 7, Dock = DockStyle.Fill };
+            for (int i = 0; i < 7; i++) statsGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / 7));
 
             lblIterations = MakeStatValue("0");
             lblMaxOpen = MakeStatValue("0");
             lblOpenEnd = MakeStatValue("0");
             lblMaxTotal = MakeStatValue("0");
             lblElapsed = MakeStatValue("0 мс");
+            lblGenerated = MakeStatValue("—");
+            lblBranching = MakeStatValue("—");
 
             AddStatRow(statsGrid, 0, "Итераций алгоритма:", lblIterations);
             AddStatRow(statsGrid, 1, "Макс. размер списка O:", lblMaxOpen);
             AddStatRow(statsGrid, 2, "Размер списка O на конец поиска:", lblOpenEnd);
             AddStatRow(statsGrid, 3, "Макс. |O| + |C| за весь поиск:", lblMaxTotal);
             AddStatRow(statsGrid, 4, "Время поиска:", lblElapsed);
+            AddStatRow(statsGrid, 5, "Сгенерировано узлов (A*):", lblGenerated);
+            AddStatRow(statsGrid, 6, "Эфф. коэффициент ветвления b*:", lblBranching);
 
             outer.Controls.Add(WrapGroup("Статистика поиска", statsGrid), 0, 0);
 
-            var runLayout = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Dock = DockStyle.Fill };
-            runLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            var runLayout = new TableLayoutPanel { ColumnCount = 2, RowCount = 5, Dock = DockStyle.Fill };
+            runLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+            runLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+            for (int i = 0; i < 3; i++) runLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
             runLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             runLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            var depthLayout = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, Dock = DockStyle.Fill, BackColor = PanelDark };
-            depthLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
-            depthLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+            runLayout.Controls.Add(MakeCaption("Алгоритм:"), 0, 0);
+            cmbAlgorithm = MakeCombo(
+                "Поиск в глубину (ЛР №1)",
+                "A*, h1: клетки / 4",
+                "A*, h2: покрытие линиями",
+                "A*, h = 0 (слепой)");
+            cmbAlgorithm.SelectedIndex = 2; // по умолчанию — A* с сильной эвристикой
+            cmbAlgorithm.SelectedIndexChanged += (s, e) => UpdateAlgorithmControls();
+            runLayout.Controls.Add(cmbAlgorithm, 1, 0);
 
-            var lblDepth = new Label
-            {
-                Text = "Глубина поиска (расширяется авто):",
-                ForeColor = TextLight,
-                BackColor = Color.Transparent,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Dock = DockStyle.Fill
-            };
+            runLayout.Controls.Add(MakeCaption("Список O (для A*):"), 0, 1);
+            cmbOpenList = MakeCombo(
+                OpenListFactory.Describe(OpenListKind.BinaryHeap),
+                OpenListFactory.Describe(OpenListKind.SortedArray),
+                OpenListFactory.Describe(OpenListKind.UnsortedList),
+                OpenListFactory.Describe(OpenListKind.Buckets));
+            cmbOpenList.SelectedIndex = 0;
+            runLayout.Controls.Add(cmbOpenList, 1, 1);
+
+            runLayout.Controls.Add(MakeCaption("Глубина DFS (расширяется авто):"), 0, 2);
             numMaxDepth = new NumericUpDown { Minimum = 1, Maximum = 200, Value = 25, Dock = DockStyle.Fill };
-            depthLayout.Controls.Add(lblDepth, 0, 0);
-            depthLayout.Controls.Add(numMaxDepth, 1, 0);
-            runLayout.Controls.Add(depthLayout, 0, 0);
+            runLayout.Controls.Add(numMaxDepth, 1, 2);
 
-            btnSolve = MakeButton("Запустить поиск в глубину (DFS)", AccentGreen);
+            btnSolve = MakeButton("Запустить поиск", AccentGreen);
             btnSolve.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnSolve.Click += BtnSolve_Click;
-            runLayout.Controls.Add(btnSolve, 0, 1);
+            btnCompare = MakeButton("Сравнить алгоритмы", Accent);
+            btnCompare.Click += (s, e) =>
+            {
+                using (var dlg = new ComparisonForm()) dlg.ShowDialog(this);
+            };
+            var buttons = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, Dock = DockStyle.Fill, BackColor = PanelDark };
+            buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            buttons.Controls.Add(btnSolve, 0, 0);
+            buttons.Controls.Add(btnCompare, 1, 0);
+            runLayout.Controls.Add(buttons, 0, 3);
+            runLayout.SetColumnSpan(buttons, 2);
 
             lblStatus = new Label
             {
@@ -234,11 +262,38 @@ namespace BallShift
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.TopLeft
             };
-            runLayout.Controls.Add(lblStatus, 0, 2);
+            runLayout.Controls.Add(lblStatus, 0, 4);
+            runLayout.SetColumnSpan(lblStatus, 2);
+
+            UpdateAlgorithmControls();
 
             outer.Controls.Add(WrapGroup("Запуск алгоритма", runLayout), 1, 0);
 
             return outer;
+        }
+
+        private Label MakeCaption(string text) => new Label
+        {
+            Text = text,
+            ForeColor = TextLight,
+            BackColor = Color.Transparent,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Dock = DockStyle.Fill
+        };
+
+        private ComboBox MakeCombo(params string[] items)
+        {
+            var cmb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+            cmb.Items.AddRange(items);
+            return cmb;
+        }
+
+        /// <summary>Индексы cmbAlgorithm: 0 — DFS, 1 — A* h1, 2 — A* h2, 3 — A* с h = 0.</summary>
+        private void UpdateAlgorithmControls()
+        {
+            bool dfs = cmbAlgorithm.SelectedIndex == 0;
+            numMaxDepth.Enabled = dfs;
+            cmbOpenList.Enabled = !dfs;
         }
 
         private void AddStatRow(TableLayoutPanel grid, int row, string caption, Label valueLabel)
@@ -320,6 +375,8 @@ namespace BallShift
             lblOpenEnd.Text = "0";
             lblMaxTotal.Text = "0";
             lblElapsed.Text = "0 мс";
+            lblGenerated.Text = "—";
+            lblBranching.Text = "—";
             lblStepInfo.Text = "Шаг: —";
             animGrid.Grid = new int[4, 4];
             _solutionPath = null;
@@ -342,6 +399,10 @@ namespace BallShift
             }
 
             int maxDepth = (int)numMaxDepth.Value;
+            int algorithm = cmbAlgorithm.SelectedIndex;
+            var openKind = (OpenListKind)Math.Max(0, cmbOpenList.SelectedIndex);
+            HeuristicKind heuristic = algorithm == 1 ? HeuristicKind.MisplacedCells
+                : algorithm == 2 ? HeuristicKind.LineCover : HeuristicKind.Zero;
 
             // Поиск может занимать заметное время, поэтому выполняем его в фоновом потоке
             // (Task.Run), чтобы форма не "зависала" и оставалась отзывчивой. Progress<T>
@@ -353,7 +414,10 @@ namespace BallShift
             (List<State> path, SearchStats stats) result;
             try
             {
-                result = await Task.Run(() => DfsSolver.Solve(start, goal, maxDepth, progress));
+                var search = algorithm == 0
+                    ? Task.Run(() => DfsSolver.Solve(start, goal, maxDepth, progress))
+                    : Task.Run(() => AStarSolver.Solve(start, goal, heuristic, openKind, progress));
+                result = await search;
             }
             finally
             {
@@ -365,6 +429,15 @@ namespace BallShift
             if (result.path == null)
             {
                 _solutionPath = null;
+                if (result.stats.Aborted && algorithm != 0)
+                {
+                    lblStatus.Text = "Поиск прерван: превышен лимит числа узлов.";
+                    MessageBox.Show(this,
+                        "Число сгенерированных узлов превысило безопасный предел по памяти. " +
+                        "Выберите более сильную эвристику (h2) или более простую задачу.",
+                        "Поиск прерван", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
                 lblStatus.Text = "Решение не найдено: целевое состояние недостижимо.";
                 MessageBox.Show(this,
                     "Путь к целевому состоянию не найден даже при максимальной глубине поиска.",
@@ -372,12 +445,13 @@ namespace BallShift
                 return;
             }
 
-            if (result.stats.LimitExtended)
+            if (algorithm == 0 && result.stats.LimitExtended)
                 numMaxDepth.Value = Math.Min(numMaxDepth.Maximum, Math.Max(numMaxDepth.Minimum, result.stats.DepthLimit));
 
             _solutionPath = result.path;
             lblStatus.Text = $"Решение найдено! Длина пути: {result.path.Count - 1} ход(ов)."
-                + (result.stats.LimitExtended ? $" Глубина автоматически увеличена с {maxDepth} до {result.stats.DepthLimit}." : "")
+                + (algorithm != 0 ? " Путь оптимален: эвристика допустима." : "")
+                + (algorithm == 0 && result.stats.LimitExtended ? $" Глубина автоматически увеличена с {maxDepth} до {result.stats.DepthLimit}." : "")
                 + " Нажмите «Анимация пути».";
             _animIndex = 0;
             animGrid.Grid = result.path[0].ToGrid();
@@ -391,6 +465,18 @@ namespace BallShift
             lblOpenEnd.Text = stats.OpenSizeAtEnd.ToString("N0");
             lblMaxTotal.Text = stats.MaxTotalSize.ToString("N0");
             lblElapsed.Text = $"{stats.Elapsed.TotalMilliseconds:0} мс";
+
+            if (stats.Generated > 0)
+            {
+                lblGenerated.Text = stats.Generated.ToString("N0");
+                double b = BranchingFactor.Effective(stats.Generated, stats.PathLength);
+                lblBranching.Text = stats.Found && !double.IsNaN(b) ? b.ToString("0.00") : "—";
+            }
+            else
+            {
+                lblGenerated.Text = "—";
+                lblBranching.Text = "—";
+            }
         }
 
         private void SetSearchInProgress(bool inProgress)
@@ -399,8 +485,18 @@ namespace BallShift
             btnRandom.Enabled = !inProgress;
             startGrid.Editable = !inProgress;
             goalGrid.Editable = !inProgress;
-            numMaxDepth.Enabled = !inProgress;
-            btnSolve.Text = inProgress ? "Идёт поиск..." : "Запустить поиск в глубину (DFS)";
+            btnCompare.Enabled = !inProgress;
+            cmbAlgorithm.Enabled = !inProgress;
+            if (inProgress)
+            {
+                numMaxDepth.Enabled = false;
+                cmbOpenList.Enabled = false;
+            }
+            else
+            {
+                UpdateAlgorithmControls();
+            }
+            btnSolve.Text = inProgress ? "Идёт поиск..." : "Запустить поиск";
         }
 
         private void BtnPlay_Click(object sender, EventArgs e)
