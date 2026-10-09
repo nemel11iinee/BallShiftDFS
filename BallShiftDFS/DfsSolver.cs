@@ -13,6 +13,8 @@ namespace BallShift
         public int MaxTotalSize;      // максимум |O| + |C| за весь процесс поиска
         public bool Found;
         public bool Aborted;          // true, если поиск остановлен досрочно (достигнут абсолютный предел глубины)
+        public int Generated;         // сколько состояний было сгенерировано (создано) за весь поиск
+        public int PathLength;        // длина найденного пути в ходах (0, если пути нет)
         public int DepthLimit;        // текущий (на момент завершения — последний) предел глубины
         public bool LimitExtended;    // true, если пришлось выйти за глубину, заданную пользователем
         public TimeSpan Elapsed;
@@ -55,6 +57,7 @@ namespace BallShift
         {
             var search = new Search(start.Packed, goal.Packed, maxDepth, progress);
             var moves = search.Run();
+            search.Stats.PathLength = moves?.Count ?? 0;
 
             List<State> path = null;
             if (moves != null)
